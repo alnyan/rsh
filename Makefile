@@ -3,6 +3,7 @@ CFLAGS?=-ggdb \
 	   	-O0 \
 	   	-Wall \
 	   	-Werror \
+		-Wno-char-subscripts \
 		-Iinclude
 LDFLAGS?=-lgcc
 

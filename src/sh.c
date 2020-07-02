@@ -91,16 +91,16 @@ static void signal_handle(int signum) {
 }
 
 int main(int argc, char **argv) {
-    int fd = STDIN_FILENO;
+    FILE *fp = stdin;
     char linebuf[256];
     int res;
 
     signal(SIGINT, signal_handle);
 
     if (argc == 2) {
-        fd = open(argv[1], O_RDONLY, 0);
+        fp = fopen(argv[1], "r");
 
-        if (fd < 0) {
+        if (!fp) {
             perror(argv[1]);
             return -1;
         }
@@ -109,15 +109,21 @@ int main(int argc, char **argv) {
         return -1;
     }
 
+    int fd = fileno(fp);
+
     // TODO: source /etc/profile?
     setenv("PATH", "/sbin:/bin", 0);
 
     if (!isatty(fd)) {
         while (1) {
-            // TODO: use fgets here
-            //if (gets_safe(fd, linebuf, sizeof(linebuf)) < 0) {
-            //    break;
-            //}
+            if (!fgets(linebuf, sizeof(linebuf), fp)) {
+                break;
+            }
+
+            char *p;
+            if (*linebuf && (p = strchr(linebuf, '\n')) != NULL) {
+                *p = 0;
+            }
 
             eval(linebuf);
         }
