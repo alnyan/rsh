@@ -33,13 +33,12 @@ DEF_BUILTIN(env) {
     return 0;
 }
 
-// XXX: Broken
-//DEF_BUILTIN(exit) {
-//    if (cmd->argc > 1) {
-//        exit(atoi(cmd->args[1]));
-//    }
-//    exit(0);
-//}
+DEF_BUILTIN(exit) {
+    if (cmd->argc > 1) {
+        exit(atoi(cmd->args[1]));
+    }
+    exit(0);
+}
 
 DEF_BUILTIN(cd) {
     if (cmd->argc != 2) {
@@ -47,34 +46,6 @@ DEF_BUILTIN(cd) {
         return -1;
     }
     return chdir(cmd->args[1]);
-}
-
-DEF_BUILTIN(cat) {
-    if (cmd->argc < 2) {
-        printf("usage: cat <filename> ...\n");
-        return -1;
-    }
-    char buf[4096];
-    ssize_t bread;
-
-    for (int i = 1; i < cmd->argc; ++i) {
-        int fd = open(cmd->args[i], O_RDONLY, 0);
-        if (fd < 0) {
-            perror(cmd->args[i]);
-            continue;
-        }
-
-        while ((bread = read(fd, buf, sizeof(buf))) > 0) {
-            write(STDOUT_FILENO, buf, bread);
-        }
-
-        if (bread < 0) {
-            perror(cmd->args[i]);
-        }
-
-        close(fd);
-    }
-    return 0;
 }
 
 DEF_BUILTIN(chmod) {
@@ -267,7 +238,6 @@ DEF_BUILTIN(builtins) {
 
 static struct sh_builtin __builtins[] = {
     DECL_BUILTIN(builtins),
-    DECL_BUILTIN(cat),
     DECL_BUILTIN(cd),
     DECL_BUILTIN(chmod),
     DECL_BUILTIN(chown),
@@ -275,7 +245,7 @@ static struct sh_builtin __builtins[] = {
     DECL_BUILTIN(echo),
     DECL_BUILTIN(env),
     DECL_BUILTIN(exec),
-//    DECL_BUILTIN(exit),
+    DECL_BUILTIN(exit),
     DECL_BUILTIN(set),
     DECL_BUILTIN(setid),
     DECL_BUILTIN(stat),

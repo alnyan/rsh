@@ -14,6 +14,8 @@
 #include "parse.h"
 #include "cmd.h"
 
+#define CMD_NOFORK      (1 << 0)
+
 typedef int (*spawn_func_t) (void *arg, struct cmd_unit *cmd);
 extern char **environ;
 
@@ -26,7 +28,7 @@ static int spawn_builtin(void *arg, struct cmd_unit *cmd) {
     return func(cmd);
 }
 
-static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid) {
+static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid, int flags) {
     int pid;
     int pipe_fds[2];
 
@@ -43,9 +45,41 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
         cmd->next->fds[0] = pipe_fds[0];
     }
 
-    if ((pid = fork()) < 0) {
-        perror("fork()");
-        return -1;
+    if (flags & CMD_NOFORK) {
+        int old_fd0 = -1;
+        int old_fd1 = -1;
+        int res;
+
+        if (cmd->prev) {
+            old_fd0 = dup(STDIN_FILENO);
+            dup2(cmd->fds[0], STDIN_FILENO);
+            close(cmd->fds[0]);
+        }
+        if (cmd->next) {
+            old_fd1 = dup(STDOUT_FILENO);
+            fprintf(stderr, "[fd1 = %d]\n", old_fd1);
+            dup2(cmd->fds[1], STDOUT_FILENO);
+            close(cmd->fds[1]);
+        }
+
+        res = fn(arg, cmd);
+
+        if (cmd->prev) {
+            dup2(old_fd0, STDIN_FILENO);
+            close(old_fd0);
+        }
+
+        if (cmd->next) {
+            dup2(old_fd1, STDOUT_FILENO);
+            close(old_fd1);
+        }
+
+        return res;
+    } else {
+        if ((pid = fork()) < 0) {
+            perror("fork()");
+            return -1;
+        }
     }
 
     if (pid == 0) {
@@ -95,7 +129,7 @@ static int cmd_exec_binary(struct cmd_unit *cmd, int *pgid) {
         }
 
         strcpy(path_path, cmd->args[0]);
-        return cmd_spawn(spawn_binary, path_path, cmd, pgid);
+        return cmd_spawn(spawn_binary, path_path, cmd, pgid, 0);
     }
 
     const char *pathvar = getenv("PATH");
@@ -119,7 +153,7 @@ static int cmd_exec_binary(struct cmd_unit *cmd, int *pgid) {
         strcpy(path_path + len + 1, cmd->args[0]);
 
         if ((res = access(path_path, X_OK)) == 0) {
-            return cmd_spawn(spawn_binary, path_path, cmd, pgid);
+            return cmd_spawn(spawn_binary, path_path, cmd, pgid, 0);
         }
 
         if (!e) {
@@ -135,18 +169,8 @@ static int cmd_unit_exec(struct cmd_unit *cmd, int *pgid) {
     int res;
     builtin_func_t builtin;
 
-    // TODO: don't spawn ALL the commands as separate processes
-    //       e.g. exit is broken and $$ evaluation will be incorrect
-    //       this is just a dirty workaround for "exit"
-    if (!strcmp(cmd->args[0], "exit")) {
-        if (cmd->argc > 1) {
-            exit(atoi(cmd->args[1]));
-        }
-        exit(0);
-    } else {
-        if ((builtin = builtin_find(cmd->args[0])) != NULL) {
-            return cmd_spawn(spawn_builtin, builtin, cmd, pgid);
-        }
+    if ((builtin = builtin_find(cmd->args[0])) != NULL) {
+        return cmd_spawn(spawn_builtin, builtin, cmd, pgid, CMD_NOFORK);
     }
 
     if ((res = cmd_exec_binary(cmd, pgid)) == 0) {
