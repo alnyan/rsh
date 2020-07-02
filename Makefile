@@ -2,12 +2,17 @@ CC?=$(CROSS_COMPILE)gcc
 CFLAGS?=-ggdb \
 	   	-O0 \
 	   	-Wall \
-	   	-Werror
+	   	-Werror \
+		-Iinclude
 LDFLAGS?=-lgcc
 
 O=build
 
-sh_OBJS=$(O)/sh.o
+sh_OBJS=$(O)/sh.o \
+		$(O)/readline.o \
+		$(O)/cmd.o \
+		$(O)/parse.o \
+		$(O)/builtin.o
 
 all: mkdirs $(O)/sh
 
@@ -23,5 +28,5 @@ install: $(O)/sh
 $(O)/sh: $(sh_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(sh_OBJS)
 
-$(O)/%.o: %.c
+$(O)/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
