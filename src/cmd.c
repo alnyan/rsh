@@ -1,10 +1,10 @@
 #include <sys/termios.h>
-#include <sys/prctl.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <ctype.h>
 #include <stdio.h>
