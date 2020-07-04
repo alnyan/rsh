@@ -23,8 +23,8 @@ mkdirs:
 clean:
 	rm -rf $(O)
 
-install: $(O)/sh
-	install -m0755 $(O)/sh $(DESTDIR)/sh
+install: mkdirs $(O)/sh
+	install -m0755 $(O)/sh $(DESTDIR)/bin/sh
 
 $(O)/sh: $(sh_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(sh_OBJS)

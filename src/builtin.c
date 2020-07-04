@@ -1,9 +1,12 @@
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <grp.h>
+#include <pwd.h>
 #include "builtin.h"
 #include "config.h"
 #include "parse.h"
@@ -202,27 +205,83 @@ DEF_BUILTIN(set) {
 
 // TODO: support usernames (getpwnam_r)
 DEF_BUILTIN(setid) {
-    if (cmd->argc == 2) {
-        // Assume gid == uid
-        if (setuid(atoi(cmd->args[1])) != 0) {
-            return -1;
-        }
-        if (setgid(atoi(cmd->args[1])) != 0) {
-            return -1;
-        }
-        return 0;
-    }
-    if (cmd->argc != 3) {
-        printf("usage: setid <uid> <gid>\n");
+    // User
+    char buf[1024];
+    struct passwd pwd;
+    struct passwd *res;
+#if 0
+    // Group
+    struct group grp;
+    struct group *grp_res;
+#endif
+
+    const char *user;
+    const char *group;
+    uid_t uid;
+    gid_t gid;
+
+    switch (cmd->argc) {
+    case 2:
+        user = cmd->args[1];
+        group = user;
+        break;
+    case 3:
+        user = cmd->args[1];
+        group = cmd->args[2];
+        break;
+    default:
+        fprintf(stderr, "usage: setid <user/uid> <group/gid>\n");
         return -1;
     }
 
-    if (setuid(atoi(cmd->args[1])) != 0) {
+    if (isdigit(user[0])) {
+        uid = atoi(user);
+    } else {
+        // Get user by name
+        if (getpwnam_r(user, &pwd, buf, sizeof(buf), &res) != 0 || !res) {
+            perror(user);
+            return -1;
+        }
+
+        uid = res->pw_uid;
+
+        // Use user login group if none specified
+        if (group == user) {
+            gid = res->pw_gid;
+            // Prevent lookup
+            group = NULL;
+        }
+    }
+
+    if (group) {
+        if (isdigit(group[0])) {
+            gid = atoi(group);
+        } else {
+            fprintf(stderr, "getgrnam_r() is not implemented\n");
+            return -1;
+            // TODO: Get group by name
+            //if (getgrnam_r(group, &grp, buf, sizeof(buf), &grp_res) != 0 || !grp_res) {
+            //    perror(group);
+            //    return -1;
+            //}
+
+            //gid = grp_res->gr_gid;
+        }
+    }
+
+    gid_t old_gid = getgid();
+
+    if (setgid(gid) != 0) {
+        perror("setgid()");
         return -1;
     }
-    if (setgid(atoi(cmd->args[2])) != 0) {
+    if (setuid(uid) != 0) {
+        perror("setuid()");
+        // Try to restore old GID
+        setgid(old_gid);
         return -1;
     }
+
     return 0;
 }
 
