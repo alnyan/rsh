@@ -57,7 +57,6 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
         }
         if (cmd->next) {
             old_fd1 = dup(STDOUT_FILENO);
-            fprintf(stderr, "[fd1 = %d]\n", old_fd1);
             dup2(cmd->fds[1], STDOUT_FILENO);
             close(cmd->fds[1]);
         }
@@ -105,6 +104,10 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
 
         exit(fn(arg, cmd));
     } else {
+        // Store pgid on parent side
+        if (*pgid == -1) {
+            *pgid = pid;
+        }
         cmd->pid = pid;
         if (cmd->next) {
             // Close write end, it's now handled by child
