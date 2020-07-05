@@ -187,6 +187,7 @@ static int cmd_unit_exec(struct cmd_unit *cmd, int *pgid) {
 int eval(char *str) {
     char *p;
     struct cmd cmd;
+    struct termios termios;
     int cmd_res, pgid;
 
     while (isspace(*str)) {
@@ -202,6 +203,12 @@ int eval(char *str) {
     }
 
     if (cmd_parse(str, &cmd) != 0) {
+        return -1;
+    }
+
+    // Store current termios in case the program breaks something
+    if ((tcgetattr(STDIN_FILENO, &termios)) != 0) {
+        perror("tcgetattr()");
         return -1;
     }
 
@@ -225,6 +232,7 @@ int eval(char *str) {
     pgid = getpgid(0);
     signal(SIGTTOU, SIG_IGN);
     tcsetpgrp(STDIN_FILENO, pgid);
+    tcsetattr(STDIN_FILENO, TCSANOW, &termios);
 
     return 0;
 }
