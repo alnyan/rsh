@@ -1,33 +1,11 @@
 #include "parse.h"
+#include "env.h"
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-
-static ssize_t var_paste(char *dst, const char *name, size_t limit) {
-    size_t l;
-    if (!strcmp(name, "$")) {
-        size_t l = snprintf(dst, limit, "%d", getpid());
-        // Output was truncated
-        if (l > limit) {
-            l = limit;
-        }
-        return l;
-    }
-    const char *e = getenv(name);
-    if (!e) {
-        return 0;
-    }
-    l = strlen(e);
-    // Output was truncated
-    if (l > limit) {
-        l = limit;
-    }
-    strncpy(dst, e, limit);
-    return l;
-}
 
 static int cmd_unit_parse(const char *str, struct cmd_unit *unit) {
     // Parse until end of string or |

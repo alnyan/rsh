@@ -13,7 +13,8 @@ sh_OBJS=$(O)/sh.o \
 		$(O)/readline.o \
 		$(O)/cmd.o \
 		$(O)/parse.o \
-		$(O)/builtin.o
+		$(O)/builtin.o \
+		$(O)/env.o
 
 all: mkdirs $(O)/sh
 

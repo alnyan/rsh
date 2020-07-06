@@ -12,6 +12,7 @@
 #include "builtin.h"
 #include "config.h"
 #include "parse.h"
+#include "env.h"
 #include "cmd.h"
 
 #define CMD_NOFORK      (1 << 0)
@@ -48,7 +49,6 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
     if (flags & CMD_NOFORK) {
         int old_fd0 = -1;
         int old_fd1 = -1;
-        int res;
 
         if (cmd->prev) {
             old_fd0 = dup(STDIN_FILENO);
@@ -61,7 +61,7 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
             close(cmd->fds[1]);
         }
 
-        res = fn(arg, cmd);
+        cmd->res = fn(arg, cmd);
 
         if (cmd->prev) {
             dup2(old_fd0, STDIN_FILENO);
@@ -73,7 +73,7 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
             close(old_fd1);
         }
 
-        return res;
+        return 0;
     } else {
         if ((pid = fork()) < 0) {
             perror("fork()");
@@ -188,7 +188,7 @@ int eval(char *str) {
     char *p;
     struct cmd cmd;
     struct termios termios;
-    int cmd_res, pgid;
+    int pgid;
 
     while (isspace(*str)) {
         ++str;
@@ -216,15 +216,25 @@ int eval(char *str) {
     pgid = -1;
     for (struct cmd_unit *u = cmd.first; u; u = u->next) {
         u->pid = -1;
+        u->res = -1;
         cmd_unit_exec(u, &pgid);
     }
 
     // Wait for spawned subprocesses to finish
     for (struct cmd_unit *u = cmd.first; u; u = u->next) {
         if (u->pid != -1) {
-            if (waitpid(u->pid, &cmd_res, 0) < 0) {
+            if (waitpid(u->pid, &u->res, 0) < 0) {
                 perror("waitpid()");
             }
+        }
+    }
+
+    struct cmd_unit *last_cmd = cmd.last;
+    if (last_cmd) {
+        if (WIFEXITED(last_cmd->res)) {
+            last_status = WEXITSTATUS(last_cmd->res);
+        } else {
+            // ...
         }
     }
 
