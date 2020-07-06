@@ -1,10 +1,12 @@
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
 #include <stdio.h>
 #include <wait.h>
 #include <grp.h>
@@ -310,13 +312,21 @@ DEF_BUILTIN(fg) {
     tcsetpgrp(STDIN_FILENO, pgid);
     kill(-pgid, SIGCONT);
 
+    // TODO: make it work for commands of several processes
     // Wait
-    res = waitpid(-pgid, &status, WSTOPPED);
+    while (1) {
+        res = waitpid(-pgid, &status, WSTOPPED);
 
-    if (res < 0) {
-        return -1;
-    } else {
-        return status;
+        if (res < 0) {
+            return -1;
+        } else {
+            if (WIFSTOPPED(status)) {
+                fprintf(stderr, "%d: stopped %s\n", pgid, cmd->args[0]);
+                job_push(pgid);
+                return 0;
+            }
+            return status;
+        }
     }
 }
 

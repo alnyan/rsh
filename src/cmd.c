@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <sys/wait.h>
+#include <wait.h>
 #include <ctype.h>
 #include <stdio.h>
 
@@ -231,6 +231,7 @@ int eval(char *str) {
         }
     }
 
+    // TODO: job control is broken for pipes
     struct cmd_unit *last_cmd = cmd.last;
     term_sig = -1;
     if (last_cmd) {
