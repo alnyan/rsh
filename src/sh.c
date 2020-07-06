@@ -84,6 +84,9 @@ static void signal_handle(int signum) {
         update_prompt();
         display_prompt();
         break;
+    case SIGSTOP:
+        printf("SIGSTOP!\n");
+        break;
     default:
         printf("\nUnhandled signal: %d\n", signum);
         break;
@@ -96,6 +99,7 @@ int main(int argc, char **argv) {
     int res;
 
     signal(SIGINT, signal_handle);
+    signal(SIGSTOP, signal_handle);
 
     if (argc == 2) {
         fp = fopen(argv[1], "r");

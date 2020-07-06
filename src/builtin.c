@@ -3,13 +3,16 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <wait.h>
 #include <grp.h>
 #include <pwd.h>
 #include "builtin.h"
 #include "config.h"
 #include "parse.h"
+#include "job.h"
 #include "cmd.h"
 
 #define DEF_BUILTIN(b_name) \
@@ -293,6 +296,30 @@ DEF_BUILTIN(builtins) {
     return 0;
 }
 
+DEF_BUILTIN(fg) {
+    int res, status;
+    int pgid = job_pop();
+
+    if (pgid < 0) {
+        return -1;
+    }
+
+    printf("%d: resumed\n", pgid);
+
+    // Grant terminal
+    tcsetpgrp(STDIN_FILENO, pgid);
+    kill(-pgid, SIGCONT);
+
+    // Wait
+    res = waitpid(-pgid, &status, WSTOPPED);
+
+    if (res < 0) {
+        return -1;
+    } else {
+        return status;
+    }
+}
+
 ////
 
 static struct sh_builtin __builtins[] = {
@@ -310,6 +337,7 @@ static struct sh_builtin __builtins[] = {
     DECL_BUILTIN(stat),
     DECL_BUILTIN(sync),
     DECL_BUILTIN(touch),
+    DECL_BUILTIN(fg),
     {NULL}
 };
 

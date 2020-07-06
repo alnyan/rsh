@@ -13,6 +13,7 @@
 #include "config.h"
 #include "parse.h"
 #include "env.h"
+#include "job.h"
 #include "cmd.h"
 
 #define CMD_NOFORK      (1 << 0)
@@ -108,6 +109,7 @@ static int cmd_spawn(spawn_func_t fn, void *arg, struct cmd_unit *cmd, int *pgid
         if (*pgid == -1) {
             *pgid = pid;
         }
+        cmd->pgid = *pgid;
         cmd->pid = pid;
         if (cmd->next) {
             // Close write end, it's now handled by child
@@ -188,7 +190,7 @@ int eval(char *str) {
     char *p;
     struct cmd cmd;
     struct termios termios;
-    int pgid;
+    int pgid, term_sig;
 
     while (isspace(*str)) {
         ++str;
@@ -223,18 +225,29 @@ int eval(char *str) {
     // Wait for spawned subprocesses to finish
     for (struct cmd_unit *u = cmd.first; u; u = u->next) {
         if (u->pid != -1) {
-            if (waitpid(u->pid, &u->res, 0) < 0) {
+            if (waitpid(u->pid, &u->res, WSTOPPED) < 0) {
                 perror("waitpid()");
             }
         }
     }
 
     struct cmd_unit *last_cmd = cmd.last;
+    term_sig = -1;
     if (last_cmd) {
-        if (WIFEXITED(last_cmd->res)) {
+        if (last_cmd->res == -1) {
+            last_status = -1;
+        } else if (WIFEXITED(last_cmd->res)) {
             last_status = WEXITSTATUS(last_cmd->res);
+        } else if (WIFSIGNALED(last_cmd->res)) {
+            term_sig = WTERMSIG(last_cmd->res);
+            last_status = term_sig + 128;
+        } else if (WIFSTOPPED(last_cmd->res)) {
+            fprintf(stderr, "%d: suspended %s\n", last_cmd->pid, str);
+            last_status = 148;
+            job_push(pgid);
         } else {
-            // ...
+            fprintf(stderr, "Unhandled condition\n");
+            last_status = -1;
         }
     }
 
@@ -243,6 +256,16 @@ int eval(char *str) {
     signal(SIGTTOU, SIG_IGN);
     tcsetpgrp(STDIN_FILENO, pgid);
     tcsetattr(STDIN_FILENO, TCSANOW, &termios);
+
+    // Describe the killing signal, if required
+    if (last_cmd && term_sig > 0 && term_sig != SIGINT) {
+        const char *res = strsignal(term_sig);
+        if (res) {
+            fprintf(stderr, "%d: %s\n", last_cmd->pid, res);
+        } else {
+            fprintf(stderr, "%d: Signal %d\n", last_cmd->pid, term_sig);
+        }
+    }
 
     return 0;
 }

@@ -2,7 +2,7 @@
 
 struct cmd_unit {
     int fds[3];
-    int pid, res;
+    int pid, pgid, res;
     int argc;
     char *args[64];
     struct cmd_unit *prev, *next;
