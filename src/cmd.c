@@ -209,9 +209,11 @@ int eval(char *str) {
     }
 
     // Store current termios in case the program breaks something
-    if ((tcgetattr(STDIN_FILENO, &termios)) != 0) {
-        perror("tcgetattr()");
-        return -1;
+    if (isatty(STDIN_FILENO)) {
+        if ((tcgetattr(STDIN_FILENO, &termios)) != 0) {
+            perror("tcgetattr()");
+            return -1;
+        }
     }
 
     // Spawn all subprocesses
@@ -253,10 +255,12 @@ int eval(char *str) {
     }
 
     // Regain control of foreground group
-    pgid = getpgid(0);
-    signal(SIGTTOU, SIG_IGN);
-    tcsetpgrp(STDIN_FILENO, pgid);
-    tcsetattr(STDIN_FILENO, TCSANOW, &termios);
+    if (isatty(STDIN_FILENO)) {
+        pgid = getpgid(0);
+        signal(SIGTTOU, SIG_IGN);
+        tcsetpgrp(STDIN_FILENO, pgid);
+        tcsetattr(STDIN_FILENO, TCSANOW, &termios);
+    }
 
     // Describe the killing signal, if required
     if (last_cmd && term_sig > 0 && term_sig != SIGINT) {

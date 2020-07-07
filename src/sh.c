@@ -101,16 +101,14 @@ int main(int argc, char **argv) {
     signal(SIGINT, signal_handle);
     signal(SIGSTOP, signal_handle);
 
-    if (argc == 2) {
+    if (argc >= 2) {
         fp = fopen(argv[1], "r");
 
         if (!fp) {
             perror(argv[1]);
             return -1;
         }
-    } else if (argc > 2) {
-        printf("usage: sh [filename]\n");
-        return -1;
+        // The rest are command arguments
     }
 
     int fd = fileno(fp);
