@@ -120,6 +120,13 @@ int readline(char *buf, size_t lim) {
             break;
         }
 
+        if (chr == 4) {
+            if (len == 0) {
+                fputs("exit\n", stderr);
+                goto err;
+            }
+        }
+
         if (chr == '\n') {
             fputc(chr, stdout);
             buf[len] = 0;
