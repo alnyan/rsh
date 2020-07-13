@@ -2,7 +2,9 @@
 #include <termios.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <stdio.h>
+#include "history.h"
 
 #define KEY_UP      (256)
 #define KEY_DOWN    (257)
@@ -86,6 +88,7 @@ int readline(char *buf, size_t lim) {
     int cur = 0;
     int chr;
 
+    struct history_entry *ent = NULL;
     struct termios t0, t1;
 
     tcgetattr(STDIN_FILENO, &t0);
@@ -118,7 +121,64 @@ int readline(char *buf, size_t lim) {
                 ++cur;
             }
             break;
+        case KEY_UP:
+            if (!ent) {
+                ent = history_head();
+            } else {
+                ent = ent->next;
+            }
+
+            if (ent) {
+                if (cur) {
+                    fprintf(stdout, "\033[%dD", cur);
+                }
+                fputs("\033[K", stdout);
+                fputs(ent->data, stdout);
+                fflush(stdout);
+                len = strlen(ent->data);
+                cur = len;
+            } else {
+                if (cur) {
+                    fprintf(stdout, "\033[%dD", cur);
+                }
+                fputs("\033[K", stdout);
+                fflush(stdout);
+                cur = 0;
+                len = 0;
+            }
+            break;
+        case KEY_DOWN:
+            if (ent) {
+                ent = ent->prev;
+
+                if (ent) {
+                    if (cur) {
+                        fprintf(stdout, "\033[%dD", cur);
+                    }
+                    fputs("\033[K", stdout);
+                    fputs(ent->data, stdout);
+                    fflush(stdout);
+                    len = strlen(ent->data);
+                    cur = len;
+                } else {
+                    if (cur) {
+                        fprintf(stdout, "\033[%dD", cur);
+                    }
+                    fputs("\033[K", stdout);
+                    fflush(stdout);
+                    cur = 0;
+                    len = 0;
+                }
+            }
+            break;
         }
+
+        if (chr == KEY_UP || chr == KEY_DOWN) {
+            continue;
+        }
+
+        // Any other move resets history position
+        ent = NULL;
 
         if (chr == 4) {
             if (len == 0) {
@@ -162,6 +222,13 @@ int readline(char *buf, size_t lim) {
         }
     }
 
+    const char *e = buf;
+    while (isspace(*e)) {
+        ++e;
+    }
+    if (*e) {
+        history_insert(buf);
+    }
 
     tcsetattr(STDIN_FILENO, TCSANOW, &t0);
     return len;
