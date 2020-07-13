@@ -221,7 +221,19 @@ int eval(char *str) {
     for (struct cmd_unit *u = cmd.first; u; u = u->next) {
         u->pid = -1;
         u->res = -1;
+        int wait = 1;
+        for (size_t i = 0; i < u->argc; ++i) {
+            if (!strcmp(u->args[i], "&")) {
+                u->argc = i;
+                u->args[i] = NULL;
+                wait = 0;
+                break;
+            }
+        }
         cmd_unit_exec(u, &pgid);
+        if (!wait) {
+            u->pid = -1;
+        }
     }
 
     // Wait for spawned subprocesses to finish
